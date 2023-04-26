@@ -39,9 +39,8 @@ export default [
     icon: { icon: 'tabler-article' },
     children: [
       { title: 'Danh sách', to: 'posts-list' },
-      { title: 'Chi tiết', to: { name: 'posts-detail-id', params: { id: '1' } } },
       { title: 'Tạo mới', to: { name: 'posts-create' } },
-      { title: 'Sửa', to: { name: 'posts-update-id', params: { id: '5036' } } },
+      // { title: 'Sửa', to: { name: 'posts-update-id', params: { id: '5036' } } },
     ],
   },
   {

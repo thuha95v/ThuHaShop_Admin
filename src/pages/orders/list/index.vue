@@ -23,7 +23,6 @@ const fetchOrders = () => {
     limit: rowPerPage.value,
     page: currentPage.value,
   }).then(res => {
-    console.log(res.data);
     orders.value = res.data.data.rows
     totalPage.value = Math.round(res.data.data.count / rowPerPage.value)
     totalOrder.value = res.data.data.count

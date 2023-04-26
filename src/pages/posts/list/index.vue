@@ -1,10 +1,15 @@
 <script setup>
 import AddNewUserDrawer from '@/views/apps/user/list/AddNewUserDrawer.vue'
-import { useUserListStore } from '@/views/apps/user/useUserStore'
+import { usePostStore } from '@/views/post/usePostStore'
 import { avatarText } from '@core/utils/formatters'
 
-const userListStore = useUserListStore()
+const HOST_CLIENT = import.meta.env.VITE_CLIENT
+
+const postStore = usePostStore()
 const searchQuery = ref('')
+const isConfirmDialogOpen = ref(false)
+const isSnackbarVisible = ref(false)
+const deleteId = ref("")
 const selectedRole = ref()
 const selectedPlan = ref()
 const selectedStatus = ref()
@@ -12,45 +17,36 @@ const rowPerPage = ref(10)
 const currentPage = ref(1)
 const totalPage = ref(1)
 const totalUsers = ref(0)
-const users = ref([])
+const posts = ref([])
 
 // 👉 Fetching users
-const fetchUsers = () => {
-  userListStore.fetchUsers({
+const fetchPosts = () => {
+  postStore.fetchPosts({
     q: searchQuery.value,
     status: selectedStatus.value,
     plan: selectedPlan.value,
     role: selectedRole.value,
     perPage: rowPerPage.value,
     currentPage: currentPage.value,
-  }).then(response => {
-    users.value = response.data.users
-    totalPage.value = response.data.totalPage
-    totalUsers.value = response.data.totalUsers
+  }).then(res => {
+    // console.log(res.data.data);
+    posts.value = res.data.data
+    totalPage.value = 1
+    totalUsers.value = 10
+    // totalPage.value = res.data.totalPage
+    // totalUsers.value = res.data.totalUsers
   }).catch(error => {
     console.error(error)
   })
 }
 
-watchEffect(fetchUsers)
+watchEffect(fetchPosts)
 
 // 👉 watching current page
 watchEffect(() => {
   if (currentPage.value > totalPage.value)
     currentPage.value = totalPage.value
 })
-
-// 👉 search filters
-const roles = [
-  {
-    title: 'Người quản trị',
-    value: 'admin',
-  },
-  {
-    title: 'Người dùng',
-    value: 'author',
-  }
-]
 
 const status = [
   {
@@ -67,50 +63,6 @@ const status = [
   },
 ]
 
-const resolveUserRoleVariant = role => {
-  if (role === 'subscriber')
-    return {
-      color: 'warning',
-      icon: 'tabler-user',
-    }
-  if (role === 'author')
-    return {
-      color: 'success',
-      icon: 'tabler-circle-check',
-    }
-  if (role === 'maintainer')
-    return {
-      color: 'primary',
-      icon: 'tabler-chart-pie-2',
-    }
-  if (role === 'editor')
-    return {
-      color: 'info',
-      icon: 'tabler-pencil',
-    }
-  if (role === 'admin')
-    return {
-      color: 'secondary',
-      icon: 'tabler-device-laptop',
-    }
-  
-  return {
-    color: 'primary',
-    icon: 'tabler-user',
-  }
-}
-
-const resolveUserStatusVariant = stat => {
-  if (stat === 'pending')
-    return 'warning'
-  if (stat === 'active')
-    return 'success'
-  if (stat === 'inactive')
-    return 'secondary'
-  
-  return 'primary'
-}
-
 const isAddNewUserDrawerVisible = ref(false)
 
 // 👉 watching current page
@@ -121,8 +73,8 @@ watchEffect(() => {
 
 // 👉 Computing pagination data
 const paginationData = computed(() => {
-  const firstIndex = users.value.length ? (currentPage.value - 1) * rowPerPage.value + 1 : 0
-  const lastIndex = users.value.length + (currentPage.value - 1) * rowPerPage.value
+  const firstIndex = posts.value.length ? (currentPage.value - 1) * rowPerPage.value + 1 : 0
+  const lastIndex = posts.value.length + (currentPage.value - 1) * rowPerPage.value
   
   return `Hiển thị ${ firstIndex } đến ${ lastIndex } của ${ totalUsers.value } mục`
 })
@@ -134,83 +86,42 @@ const addNewUser = userData => {
   fetchUsers()
 }
 
-// 👉 List
-const userListMeta = [
-  {
-    icon: 'tabler-user',
-    color: 'primary',
-    title: 'Tổng số lượng',
-    stats: '21,459',
-    percentage: +29,
-    subtitle: '',
-  },
-  {
-    icon: 'tabler-user-plus',
-    color: 'error',
-    title: 'Người dùng hoạt động',
-    stats: '4,567',
-    percentage: +18,
-    subtitle: '',
-  },
-  {
-    icon: 'tabler-user-check',
-    color: 'success',
-    title: 'Người dùng bị khóa',
-    stats: '19,860',
-    percentage: -14,
-    subtitle: '',
-  },
-  {
-    icon: 'tabler-user-exclamation',
-    color: 'warning',
-    title: 'Số lượng Admin',
-    stats: '2',
-    percentage: +0,
-    subtitle: '',
-  },
-]
+const getLink = (slug) => {
+  return `${HOST_CLIENT}/tin-tuc/${slug}`
+}
+
+const openDialog = (id) => {
+  isConfirmDialogOpen.value = true
+  deleteId.value = id
+}
+
+const confirmHandler = (isConfirm) => {
+  if(isConfirm){
+    postStore.deleteById(deleteId.value).then((res) => {
+      if(res.status == 200){
+        isSnackbarVisible.value = true
+      }
+
+      fetchPosts()
+    }).catch((err) => {
+      console.log(err);
+    })
+  }
+
+}
 </script>
 
 <template>
   <section>
     <VRow>
-      <VCol
-        v-for="meta in userListMeta"
-        :key="meta.title"
-        cols="12"
-        sm="6"
-        lg="3"
-      >
-        <VCard>
-          <VCardText class="d-flex justify-space-between">
-            <div>
-              <span>{{ meta.title }}</span>
-              <div class="d-flex align-center gap-2 my-1">
-                <h6 class="text-h6">
-                  {{ meta.stats }}
-                </h6>
-                <span :class="meta.percentage > 0 ? 'text-success' : 'text-error'">({{ meta.percentage }}%)</span>
-              </div>
-              <span>{{ meta.subtitle }}</span>
-            </div>
-
-            <VAvatar
-              rounded
-              variant="tonal"
-              :color="meta.color"
-              :icon="meta.icon"
-            />
-          </VCardText>
-        </VCard>
-      </VCol>
 
       <VCol cols="12">
-        <VCard title="Bộ lọc">
+        <VCard title="Quản lý bài viết">
           <!-- 👉 Filters -->
           <VCardText>
             <VRow>
               <!-- 👉 Select Role -->
-              <VCol
+              <!-- <VCol
                 cols="12"
                 sm="4"
               >
@@ -221,9 +132,9 @@ const userListMeta = [
                   clearable
                   clear-icon="tabler-x"
                 />
-              </VCol>
+              </VCol> -->
               <!-- 👉 Select Status -->
-              <VCol
+              <!-- <VCol
                 cols="12"
                 sm="4"
               >
@@ -234,7 +145,7 @@ const userListMeta = [
                   clearable
                   clear-icon="tabler-x"
                 />
-              </VCol>
+              </VCol> -->
             </VRow>
           </VCardText>
 
@@ -277,7 +188,7 @@ const userListMeta = [
               <!-- 👉 Add user button -->
               <VBtn
                 prepend-icon="tabler-plus"
-                @click="isAddNewUserDrawerVisible = true"
+                :to="{ name: 'posts-create' }"
               >
                 Tạo mới
               </VBtn>
@@ -291,20 +202,20 @@ const userListMeta = [
             <thead>
               <tr>
                 <th scope="col">
-                  HỌ VÀ TÊN
+                  #
                 </th>
                 <th scope="col">
-                  QUYỀN
+                  Ảnh thumnail
                 </th>
                 <th scope="col">
-                  EMAIL
+                  Tiêu đề
                 </th>
                 <th scope="col">
-                  SĐT
+                  Tác giả
                 </th>
-                <th scope="col">
+                <!-- <th scope="col">
                   TRẠNG THÁI
-                </th>
+                </th> -->
                 <th scope="col">
                   CHỨC NĂNG
                 </th>
@@ -313,14 +224,14 @@ const userListMeta = [
             <!-- 👉 table body -->
             <tbody>
               <tr
-                v-for="user in users"
-                :key="user.id"
+                v-for="post, index in posts"
+                :key="post.id"
                 style="height: 3.75rem;"
               >
                 <!-- 👉 User -->
                 <td>
                   <div class="d-flex align-center">
-                    <VAvatar
+                    <!-- <VAvatar
                       variant="tonal"
                       :color="resolveUserRoleVariant(user.role).color"
                       class="me-3"
@@ -330,56 +241,47 @@ const userListMeta = [
                         v-if="user.avatar"
                         :src="user.avatar"
                       />
-                      <span v-else>{{ avatarText(user.fullName) }}</span>
-                    </VAvatar>
+                      <span v-else>{{ post.id }}</span>
+                    </VAvatar> -->
 
                     <div class="d-flex flex-column">
                       <h6 class="text-base">
                         <RouterLink
-                          :to="{ name: 'apps-user-view-id', params: { id: user.id } }"
+                          :to="{ name: 'apps-user-view-id', params: { id: post.id } }"
                           class="font-weight-medium user-list-name"
                         >
-                          {{ user.fullName }}
+                          {{ index }}
                         </RouterLink>
                       </h6>
-                      <span class="text-sm text-disabled">@{{ user.email }}</span>
                     </div>
                   </div>
                 </td>
 
-                <!-- 👉 Role -->
                 <td>
                   <VAvatar
-                    :color="resolveUserRoleVariant(user.role).color"
-                    :icon="resolveUserRoleVariant(user.role).icon"
                     variant="tonal"
-                    size="30"
+                    size="50"
                     class="me-4"
-                  />
-                  <span class="text-capitalize text-base">{{ user.role }}</span>
+                  >
+                    <VImg
+                      v-if="post.thumbnail"
+                      :src="post.thumbnail"
+                    />
+                  </VAvatar>
+                </td>
+
+                <!-- 👉 Role -->
+                <td>
+                  <span class="text-capitalize text-base">{{ post.title }}</span>
                 </td>
 
                 <!-- 👉 Plan -->
                 <td>
-                  <span class="text-capitalize text-base font-weight-semibold">{{ user.email }}</span>
+                  <span class="text-base">{{ post.user.first_name }} {{ post.user.last_name }}</span>
                 </td>
 
                 <!-- 👉 Billing -->
-                <td>
-                  <span class="text-base">{{ user.phone }}</span>
-                </td>
-
-                <!-- 👉 Status -->
-                <td>
-                  <VChip
-                    label
-                    :color="resolveUserStatusVariant(user.status)"
-                    size="small"
-                    class="text-capitalize"
-                  >
-                    {{ user.status }}
-                  </VChip>
-                </td>
+                
 
                 <!-- 👉 Actions -->
                 <td
@@ -391,6 +293,21 @@ const userListMeta = [
                     size="x-small"
                     color="default"
                     variant="text"
+                    :href="getLink(post.slug)"
+                    target="_blank"
+                  >
+                    <VIcon
+                      size="22"
+                      icon="tabler-eye"
+                    />
+                  </VBtn>
+
+                  <VBtn
+                    icon
+                    size="x-small"
+                    color="default"
+                    variant="text"
+                    :to="{ name: 'posts-update-id', params: { id: post.id} }"
                   >
                     <VIcon
                       size="22"
@@ -403,43 +320,19 @@ const userListMeta = [
                     size="x-small"
                     color="default"
                     variant="text"
+                    @click="openDialog(post.id)"
                   >
                     <VIcon
                       size="22"
                       icon="tabler-trash"
                     />
                   </VBtn>
-
-                  <VBtn
-                    icon
-                    size="x-small"
-                    color="default"
-                    variant="text"
-                  >
-                    <VIcon
-                      size="22"
-                      icon="tabler-dots-vertical"
-                    />
-
-                    <VMenu activator="parent">
-                      <VList>
-                        <VListItem
-                          title="Xem chi tiết"
-                          :to="{ name: 'apps-user-view-id', params: { id: user.id } }"
-                        />
-                        <VListItem
-                          title="Khóa / Mở khóa"
-                          href="javascript:void(0)"
-                        />
-                      </VList>
-                    </VMenu>
-                  </VBtn>
                 </td>
               </tr>
             </tbody>
 
             <!-- 👉 table footer  -->
-            <tfoot v-show="!users.length">
+            <tfoot v-show="!posts.length">
               <tr>
                 <td
                   colspan="7"
@@ -467,13 +360,22 @@ const userListMeta = [
           </VCardText>
         </VCard>
       </VCol>
-    </VRow>
 
-    <!-- 👉 Add New User -->
-    <AddNewUserDrawer
-      v-model:isDrawerOpen="isAddNewUserDrawerVisible"
-      @user-data="addNewUser"
-    />
+      <ConfirmDialog
+        v-model:isDialogVisible="isConfirmDialogOpen"
+        confirmation-msg="Bạn chắn chắn muốn xóa bài viết này ?"
+        @confirm="confirmHandler"
+      />
+
+      <VSnackbar
+        v-model="isSnackbarVisible"
+        location="top end"
+      >
+        <VAlert type="success">
+          Xóa thành công
+        </VAlert>
+      </VSnackbar>
+    </VRow>
   </section>
 </template>
 
